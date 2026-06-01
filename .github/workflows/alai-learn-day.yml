@@ -10,6 +10,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    env:
+      LEARN_MODE: cloud
+      LEARN_MAX_CYCLES: 1
+      LEARN_MAX_MINUTES: 15
+
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+      GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+      GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+      GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+      GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+      GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
+
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
+      CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
+      CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
+      CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
+
+      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+      SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
+      SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
+      SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
+      SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
+
+      HF_API_KEY: ${{ secrets.HF_API_KEY }}
+      HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
+      HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
+      HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
+      HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -26,9 +59,18 @@ jobs:
       - name: Prepare folders and DB
         run: |
           mkdir -p logs data
-          if [ ! -f data/alai.db ] && [ -f seed/alai.seed.db.gz ]; then
+          if [ -f seed/alai.seed.db.gz ]; then
             gzip -dc seed/alai.seed.db.gz > data/alai.db
           fi
+          ls -lh data || true
+
+      - name: Check teacher keys
+        run: |
+          [ -n "$GROQ_API_KEY" ] && echo "GROQ=OK" || echo "GROQ=MISSING"
+          [ -n "$MISTRAL_API_KEY" ] && echo "MISTRAL=OK" || echo "MISTRAL=MISSING"
+          [ -n "$CEREBRAS_API_KEY" ] && echo "CEREBRAS=OK" || echo "CEREBRAS=MISSING"
+          [ -n "$SAMBANOVA_API_KEY" ] && echo "SAMBANOVA=OK" || echo "SAMBANOVA=MISSING"
+          [ -n "$HF_API_KEY" ] && echo "HF=OK" || echo "HF=MISSING"
 
       - name: Start ALAI server
         run: |
@@ -36,50 +78,10 @@ jobs:
           sleep 20
           curl -f http://localhost:6969/api/health
 
-      - name: Show server boot logs before learning
+      - name: Show server boot logs
         run: cat logs/server-boot.log || true
 
-
-      - name: Check teacher keys
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          HF_API_KEY: ${{ secrets.HF_API_KEY }}
-        run: |
-          [ -n "$GROQ_API_KEY" ] && echo "GROQ=OK" || echo "GROQ=MISSING"
-          [ -n "$GROQ_API_KEY_2" ] && echo "GROQ2=OK" || echo "GROQ2=MISSING"
-          [ -n "$MISTRAL_API_KEY" ] && echo "MISTRAL=OK" || echo "MISTRAL=MISSING"
-          [ -n "$HF_API_KEY" ] && echo "HF=OK" || echo "HF=MISSING"
-
       - name: Run ALAI cloud cycle
-        env:
-          LEARN_MODE: cloud
-          LEARN_MAX_CYCLES: 1
-          LEARN_MAX_MINUTES: 15
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
-          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
-          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
-          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
-          GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
-          GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-          CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
-          CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
-          CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
-          CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
-          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
-          SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
-          SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
-          SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
-          SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
-          HF_API_KEY: ${{ secrets.HF_API_KEY }}
-          HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
-          HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
-          HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
-          HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
         run: |
           timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log
 
