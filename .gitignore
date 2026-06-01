@@ -53,3 +53,7 @@ logs/
 .env
 .env.local
 .env.*.local
+
+# Keep DB backup seed for GitHub Actions
+!seed/
+!seed/alai.seed.db.gz
