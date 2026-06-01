@@ -21,7 +21,7 @@ jobs:
     env:
       LEARN_MODE: cloud
       LEARN_MAX_CYCLES: 1
-      LEARN_MAX_MINUTES: 15
+      LEARN_MAX_MINUTES: 8
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
       GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Learn
         run: |
-          timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log
+          timeout 8m npm run learn:cloud 2>&1 | tee logs/server.log || true
 
       - name: Save learned DB
         if: always()
@@ -81,8 +81,7 @@ jobs:
           git config user.email "github-actions@github.com"
           git add seed/alai.seed.db.gz
           git commit -m "update ALAI learned database" || echo "No DB changes"
-          git pull --rebase origin main
-          git push
+          git push || true
 
       - name: Upload logs
         if: always()
