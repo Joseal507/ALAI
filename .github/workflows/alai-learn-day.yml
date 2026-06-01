@@ -39,6 +39,19 @@ jobs:
       - name: Show server boot logs before learning
         run: cat logs/server-boot.log || true
 
+
+      - name: Check teacher keys
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
+        run: |
+          [ -n "$GROQ_API_KEY" ] && echo "GROQ=OK" || echo "GROQ=MISSING"
+          [ -n "$GROQ_API_KEY_2" ] && echo "GROQ2=OK" || echo "GROQ2=MISSING"
+          [ -n "$MISTRAL_API_KEY" ] && echo "MISTRAL=OK" || echo "MISTRAL=MISSING"
+          [ -n "$HF_API_KEY" ] && echo "HF=OK" || echo "HF=MISSING"
+
       - name: Run ALAI cloud cycle
         env:
           LEARN_MODE: cloud
