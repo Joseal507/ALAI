@@ -3,7 +3,8 @@ name: ALAI Learn Day
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0,20,40 14-02 * * *"
+    - cron: "0,20,40 14-23 * * *"
+    - cron: "0,20,40 0-2 * * *"
 
 jobs:
   learn:
