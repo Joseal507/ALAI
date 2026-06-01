@@ -1,10 +1,9 @@
 name: ALAI Auto Learning
 
 on:
-  schedule:
-    - cron: "0,20,40 14-23 * * *"
-    - cron: "0,20,40 0-2 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [alai-auto-loop]
 
 permissions:
   contents: write
@@ -82,6 +81,20 @@ jobs:
           git commit -m "update ALAI learned database" || echo "No DB changes"
           git pull --rebase origin main || true
           git push || true
+
+      - name: Schedule next run test
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HOUR=$(TZ=America/Panama date +%H)
+          if [ "$HOUR" -ge 9 ] && [ "$HOUR" -le 21 ]; then
+            echo "Waiting 5 minutes before next autonomous run..."
+            sleep 300
+            gh api repos/${{ github.repository }}/dispatches -f event_type=alai-auto-loop
+          else
+            echo "Outside learning window. Auto-loop stopped."
+          fi
 
       - name: Upload logs
         if: always()
