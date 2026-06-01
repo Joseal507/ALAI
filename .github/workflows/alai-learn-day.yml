@@ -1,0 +1,54 @@
+name: ALAI Learn Day
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Panamá = UTC-5
+    # 9:17am, 12:17pm, 3:17pm, 6:17pm Panamá
+    - cron: "17 14,17,20,23 * * *"
+
+concurrency:
+  group: alai-learn-day
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Prepare logs
+        run: mkdir -p logs
+
+      - name: Run ALAI cloud cycle
+        env:
+          LEARN_MODE: cloud
+          LEARN_MAX_CYCLES: 1
+          LEARN_MAX_MINUTES: 15
+          LEARN_PRIORITY_FIRST: "999"
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          npm run learn:cloud 2>&1 | tee logs/server.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alai-learn-log
+          path: logs/server.log
