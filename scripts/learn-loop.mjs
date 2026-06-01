@@ -1,3 +1,7 @@
+process.on('SIGTERM', () => {
+  console.log('Job cancelled, exiting learn-loop...');
+  process.exit(0);
+});
 const BASE_URL = process.env.ALAI_BASE_URL || 'http://localhost:6969';
 const DELAY_MS = Number(process.env.ALAI_LEARN_DELAY_MS || 30000);
 const ERROR_DELAY_MS = Number(process.env.ALAI_ERROR_DELAY_MS || 20000);
