@@ -23,8 +23,12 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Prepare folders
-        run: mkdir -p logs data
+      - name: Prepare folders and DB
+        run: |
+          mkdir -p logs data
+          if [ ! -f data/alai.db ] && [ -f seed/alai.seed.db.gz ]; then
+            gzip -dc seed/alai.seed.db.gz > data/alai.db
+          fi
 
       - name: Start ALAI server
         run: |
