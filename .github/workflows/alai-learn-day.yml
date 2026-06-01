@@ -45,10 +45,28 @@ jobs:
           LEARN_MAX_CYCLES: 1
           LEARN_MAX_MINUTES: 15
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+          GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+          GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
+          CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
+          CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
+          CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
           SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
+          SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
+          SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
+          SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
+          HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
+          HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
+          HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
+          HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
         run: |
           timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log
 
