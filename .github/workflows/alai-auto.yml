@@ -20,7 +20,7 @@ jobs:
     env:
       LEARN_MODE: cloud
       LEARN_MAX_CYCLES: 1
-      LEARN_MAX_MINUTES: 8
+      LEARN_MAX_MINUTES: 15
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
       GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Learn
         run: |
-          timeout 8m npm run learn:cloud 2>&1 | tee logs/server.log || true
+          timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log || true
 
       - name: Save DB
         if: always()
@@ -90,7 +90,7 @@ jobs:
           HOUR=$(TZ=America/Panama date +%H)
           if [ "$HOUR" -ge 9 ] && [ "$HOUR" -le 21 ]; then
             echo "Waiting 5 minutes before next autonomous run..."
-            sleep 300
+            sleep 120
             gh api repos/${{ github.repository }}/dispatches -f event_type=alai-auto-loop
           else
             echo "Outside learning window. Auto-loop stopped."
