@@ -15,7 +15,7 @@ concurrency:
 jobs:
   learn:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 16
 
     env:
       LEARN_MODE: cloud
@@ -70,27 +70,15 @@ jobs:
         run: |
           timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log || true
 
-      - name: Save DB
-        if: always()
-        run: |
-          sqlite3 data/alai.db ".backup seed/alai.seed.db"
-          gzip -f seed/alai.seed.db
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add seed/alai.seed.db.gz
-          git commit -m "update ALAI learned database" || echo "No DB changes"
-          git pull --rebase origin main || true
-          git push || true
-
-      - name: Schedule next run test
+      - name: Schedule next run
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           HOUR=$(TZ=America/Panama date +%H)
           if [ "$HOUR" -ge 9 ] && [ "$HOUR" -le 21 ]; then
-            echo "Waiting 5 minutes before next autonomous run..."
-            sleep 120
+            echo "Waiting 20 minutes before next autonomous run..."
+            sleep 1200
             gh api repos/${{ github.repository }}/dispatches -f event_type=alai-auto-loop
           else
             echo "Outside learning window. Auto-loop stopped."
