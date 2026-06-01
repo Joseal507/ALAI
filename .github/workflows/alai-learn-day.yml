@@ -32,6 +32,9 @@ jobs:
           sleep 20
           curl -f http://localhost:6969/api/health
 
+      - name: Show server boot logs before learning
+        run: cat logs/server-boot.log || true
+
       - name: Run ALAI cloud cycle
         env:
           LEARN_MODE: cloud
