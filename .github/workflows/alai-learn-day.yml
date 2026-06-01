@@ -3,90 +3,70 @@ name: ALAI Learn Day
 on:
   workflow_dispatch:
   schedule:
-    # Panamá 9:00am-9:40pm = UTC 14-23 y 0-2
-    - cron: "0,20,40 14-23 * * *"
-    - cron: "0,20,40 0-2 * * *"
-
-permissions:
-  contents: write
-
-concurrency:
-  group: alai-learn-day
-  cancel-in-progress: false
+    # Cada 20 min desde 8am hasta 9pm Panamá (ajustar UTC si es necesario)
+    - cron: "0,20,40 13-02 * * *"
 
 jobs:
   learn:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    env:
-      LEARN_MODE: cloud
-      LEARN_MAX_CYCLES: 1
-      LEARN_MAX_MINUTES: 15
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
-      GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
-      GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
-      GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
-      GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
-      GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
-      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
-      CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
-      CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
-      CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
-      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
-      SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
-      SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
-      SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
-      SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
-      HF_API_KEY: ${{ secrets.HF_API_KEY }}
-      HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
-      HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
-      HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
-      HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - name: Install deps
+        run: npm ci
 
-      - name: Prepare DB
+      - name: Prepare folders and DB
         run: |
-          mkdir -p logs data seed
-          gzip -dc seed/alai.seed.db.gz > data/alai.db
-          ls -lh data/alai.db
+          mkdir -p logs data
+          if [ ! -f data/alai.db ] && [ -f seed/alai.seed.db.gz ]; then
+            gzip -dc seed/alai.seed.db.gz > data/alai.db
+          fi
 
-      - name: Start ALAI server
+      - name: Check teacher keys
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
         run: |
-          npm run dev -- -p 6969 > logs/server-boot.log 2>&1 &
-          sleep 20
-          curl -f http://localhost:6969/api/health
+          [ -n "$GROQ_API_KEY" ] && echo "GROQ=OK" || echo "GROQ=MISSING"
+          [ -n "$MISTRAL_API_KEY" ] && echo "MISTRAL=OK" || echo "MISTRAL=MISSING"
+          [ -n "$HF_API_KEY" ] && echo "HF=OK" || echo "HF=MISSING"
 
-      - name: Learn
+      - name: Run ALAI cloud cycle
+        env:
+          LEARN_MODE: cloud
+          LEARN_MAX_CYCLES: 1
+          LEARN_MAX_MINUTES: 15
+          LEARN_PRIORITY_FIRST: "999"
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
         run: |
           timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log
-
-      - name: Save learned DB
-        if: always()
-        run: |
-          sqlite3 data/alai.db ".backup seed/alai.seed.db"
-          gzip -f seed/alai.seed.db
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add seed/alai.seed.db.gz
-          git commit -m "update ALAI learned database" || echo "No DB changes"
-          git push
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: alai-logs
-          path: logs/
+          name: alai-learn-log
+          path: logs/server.log
