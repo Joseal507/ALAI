@@ -46,3 +46,10 @@ logs/
 .env.local
 .env.*.local
 data/
+
+# ALAI runtime
+data/
+logs/
+.env
+.env.local
+.env.*.local

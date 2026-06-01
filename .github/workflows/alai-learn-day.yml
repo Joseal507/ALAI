@@ -3,18 +3,13 @@ name: ALAI Learn Day
 on:
   workflow_dispatch:
   schedule:
-    # Panamá = UTC-5
-    # 9:17am, 12:17pm, 3:17pm, 6:17pm Panamá
+    # UTC-5 Panamá, ejecuta a 9am, 12pm, 3pm, 6pm
     - cron: "17 14,17,20,23 * * *"
-
-concurrency:
-  group: alai-learn-day
-  cancel-in-progress: false
 
 jobs:
   learn:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repo
@@ -29,9 +24,15 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Prepare logs
-        run: mkdir -p logs
+      - name: Prepare folders
+        run: mkdir -p logs data
 
+      - name: Download previous DB
+        uses: actions/download-artifact@v4
+        with:
+          name: alai-db
+          path: data/
+          
       - name: Run ALAI cloud cycle
         env:
           LEARN_MODE: cloud
@@ -45,6 +46,13 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           npm run learn:cloud 2>&1 | tee logs/server.log
+
+      - name: Upload updated DB
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alai-db
+          path: data/alai.db
 
       - name: Upload logs
         if: always()
