@@ -1,3 +1,4 @@
+import { safeJsonParse, buildFallbackKnowledge } from '../utils/jsonRepair';
 import { askMultipleTeachers } from '../teachers/studyai';
 import { createLearningJob, normalizeKnowledgeUnit } from './jobs';
 import { ALAI_SYSTEM_PROMPT } from '../prompts/system';

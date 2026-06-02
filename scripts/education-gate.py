@@ -56,12 +56,20 @@ AND status='pending'
 active_stage = "POST_DOCTORADO"
 
 for stage, base in STAGES:
-    remaining = cur.execute("""
-    SELECT COUNT(*) FROM learning_jobs
-    WHERE stage=? AND status!='completed'
-    """, (stage,)).fetchone()[0]
+    row = cur.execute("""
+    SELECT
+      COUNT(*) total,
+      SUM(CASE WHEN mp.completed=1 THEN 1 ELSE 0 END) completed
+    FROM education_required_coverage c
+    LEFT JOIN mastery_progress mp
+      ON mp.path = c.path
+    WHERE c.stage=?
+    """, (stage,)).fetchone()
 
-    if remaining > 0:
+    total = row[0] or 0
+    completed = row[1] or 0
+
+    if total > 0 and completed < total:
         active_stage = stage
         break
 
