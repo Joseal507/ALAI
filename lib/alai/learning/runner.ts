@@ -178,7 +178,7 @@ Reglas:
   ) {
     for (const related of knowledge.relatedConcepts.slice(0, 12)) {
       enqueueLearningJob(
-        `ALAI_LEARN_TOPIC | stage=${job.stage || 'POST_DOCTORADO'} | parent=${cleanLearningTopic.slice(0, 180)} | target=${related} | mastery_required=90 | task=Learn this discovered child topic completely.`,
+        `ALAI_LEARN_TOPIC | stage=${(job as any).stage || 'POST_DOCTORADO'} | parent=${cleanLearningTopic.slice(0, 180)} | target=${related} | mastery_required=90 | task=Learn this discovered child topic completely.`,
         Math.max(20, job.priority - 1)
       );
     }
