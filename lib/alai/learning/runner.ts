@@ -13,6 +13,23 @@ import { completeMissionForTopic } from '../agents/research-planner';
 import { db } from '../storage/db';
 
 
+
+function normalizeRelatedConcept(raw: string) {
+  let x = String(raw || '').trim();
+
+  const target = x.match(/target=([^|]+)/i)?.[1];
+  if (target) x = target.trim();
+
+  x = x.replace(/^concepto:\s*/i, '');
+  x = x.replace(/^concept:\s*/i, '');
+  x = x.replace(/^nombre:\s*/i, '');
+
+  x = x.split(/\s+(description|descripcion|relation|relacion|path|mastery_required|task):/i)[0].trim();
+  x = x.split(/\s+\|\s+/)[0].trim();
+
+  return x.replace(/\s+/g, ' ').slice(0, 160);
+}
+
 function parseInternalLearningTopic(topic: string) {
   const stage = topic.match(/stage=([^|]+)/)?.[1]?.trim() || 'POST_DOCTORADO';
   const path = topic.match(/path=([^|]+)/)?.[1]?.trim() || '';
@@ -241,8 +258,13 @@ Reglas:
 
   await inferRelationshipsForKnowledge(knowledge);
 
-  for (const related of knowledge.relatedConcepts.slice(0, 6)) {
-    enqueueLearningJob(related, Math.max(10, job.priority - 5));
+  for (const relatedRaw of knowledge.relatedConcepts.slice(0, 6)) {
+    const related = normalizeRelatedConcept(relatedRaw);
+    if (!related) continue;
+    enqueueLearningJob(
+      `ALAI_LEARN_TOPIC | stage=${meta.stage || (job as any).stage || 'POST_DOCTORADO'} | target=${related} | task=Learn this discovered child topic completely.`,
+      Math.max(10, Math.min(50000, job.priority - 5))
+    );
   }
 
   if (
@@ -250,10 +272,12 @@ Reglas:
     rawLearningTopic.includes('ALAI_CURRICULUM_EXPAND') ||
     rawLearningTopic.includes('ALAI_LEARN_TOPIC')
   ) {
-    for (const related of knowledge.relatedConcepts.slice(0, 12)) {
+    for (const relatedRaw of knowledge.relatedConcepts.slice(0, 12)) {
+      const related = normalizeRelatedConcept(relatedRaw);
+      if (!related) continue;
       enqueueLearningJob(
         `ALAI_LEARN_TOPIC | stage=${meta.stage || (job as any).stage || 'POST_DOCTORADO'} | parent=${cleanLearningTopic.slice(0, 180)} | target=${related} | mastery_required=90 | task=Learn this discovered child topic completely.`,
-        Math.max(20, job.priority - 1)
+        Math.max(20, Math.min(50000, job.priority - 1))
       );
     }
   }
