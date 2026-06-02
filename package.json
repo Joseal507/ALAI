@@ -16,7 +16,8 @@
     "alai:curriculum": "node scripts/alai-curriculum-os.mjs",
     "alai:gate": "python3 scripts/education-gate.py",
     "alai:reset-zero": "node scripts/alai-reset-zero.mjs",
-    "alai:expand": "node scripts/alai-auto-expand.mjs"
+    "alai:expand": "node scripts/alai-auto-expand.mjs",
+    "alai:auto": "node scripts/alai-autonomous-runner.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
