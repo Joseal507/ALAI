@@ -40,6 +40,42 @@ export function createKnowledgeId(title: string) {
     .slice(0, 80);
 }
 
+
+function cleanText(value: any): string {
+  if (value == null) return '';
+
+  if (typeof value === 'string') return value.trim();
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => cleanText(item))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, val]) => {
+        const cleaned = cleanText(val);
+        return cleaned ? `${key}: ${cleaned}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return String(value).trim();
+}
+
+function cleanMixedArray(value: any): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => cleanText(item))
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => item !== '[object Object]');
+}
+
 export function normalizeKnowledgeUnit(raw: any, topic: string): AlaiKnowledgeUnit {
   const now = Date.now();
   const penalty = qualityPenalty(raw);
@@ -48,12 +84,12 @@ export function normalizeKnowledgeUnit(raw: any, topic: string): AlaiKnowledgeUn
 
   return {
     id: createKnowledgeId(raw?.title || topic),
-    title: String(raw?.title || topic).trim(),
-    summary: String(raw?.summary || '').trim(),
-    explanation: String(raw?.explanation || '').trim(),
-    examples: cleanStringArray(raw?.examples),
-    commonMistakes: cleanStringArray(raw?.commonMistakes),
-    relatedConcepts: cleanStringArray(raw?.relatedConcepts),
+    title: cleanText(raw?.title || topic),
+    summary: cleanText(raw?.summary),
+    explanation: cleanText(raw?.explanation),
+    examples: cleanMixedArray(raw?.examples),
+    commonMistakes: cleanMixedArray(raw?.commonMistakes),
+    relatedConcepts: cleanMixedArray(raw?.relatedConcepts),
     sources: cleanSources(raw?.sources?.length ? raw.sources : ['teacher_network']),
     confidence,
     createdAt: now,
