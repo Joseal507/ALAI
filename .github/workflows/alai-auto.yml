@@ -66,6 +66,12 @@ jobs:
       - name: Apply education gate
         run: python3 scripts/education-gate.py
 
+      - name: Apply Curriculum OS
+        run: npm run alai:curriculum
+
+      - name: Apply Education Gate
+        run: npm run alai:gate
+
       - name: Start server
         run: |
           npm run dev -- -p 6969 > logs/server-boot.log 2>&1 &
