@@ -11,7 +11,8 @@
     "learn:loop": "node scripts/learn-loop.mjs",
     "learn:loop:fast": "ALAI_LEARN_DELAY_MS=10000 node scripts/learn-loop.mjs",
     "learn:loop:slow": "ALAI_LEARN_DELAY_MS=120000 node scripts/learn-loop.mjs",
-    "learn:cloud": "node scripts/learn-loop.mjs"
+    "learn:cloud": "node scripts/learn-loop.mjs",
+    "alai:report": "node scripts/alai-report.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
