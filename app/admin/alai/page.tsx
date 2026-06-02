@@ -59,6 +59,24 @@ export default async function AlaiAdminPage() {
       </section>
 
       <section style={{ ...card, marginTop: 16 }}>
+        <h2>Cobertura obligatoria</h2>
+        {(data.coverage || []).map((c: any) => {
+          const pct = c.total ? Math.round((Number(c.completed || 0) / Number(c.total)) * 100) : 0;
+          return (
+            <div key={c.stage} style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <strong>{c.stage}</strong>
+                <span>{pct}% · {c.completed || 0}/{c.total} · avg {c.avg_confidence || 0}</span>
+              </div>
+              <div style={{ height: 10, background: '#222', borderRadius: 999 }}>
+                <div style={{ width: `${pct}%`, height: 10, background: '#d4af37', borderRadius: 999 }} />
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section style={{ ...card, marginTop: 16 }}>
         <h2>Próximos aprendizajes</h2>
         {data.nextJobs.map((j: any, i: number) => (
           <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid #222' }}>

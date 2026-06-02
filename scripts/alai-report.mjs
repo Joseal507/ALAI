@@ -86,15 +86,16 @@ console.log('-----------------------');
 for (const r of all(`
 SELECT c.stage,
        COUNT(*) AS total,
-       SUM(CASE WHEN j.status='completed' THEN 1 ELSE 0 END) AS completed
+       SUM(CASE WHEN mp.completed=1 THEN 1 ELSE 0 END) AS completed,
+       ROUND(AVG(CASE WHEN mp.completed=1 THEN mp.confidence ELSE NULL END),2) AS avg_confidence
 FROM education_required_coverage c
-LEFT JOIN learning_jobs j
-  ON j.topic LIKE '%' || c.path || '%'
+LEFT JOIN mastery_progress mp
+  ON mp.path = c.path
 GROUP BY c.stage
 ORDER BY c.stage
 `)) {
   const pct = r.total ? Math.round((Number(r.completed || 0) / Number(r.total)) * 100) : 0;
-  console.log(`${String(r.stage).padEnd(15)} ${String(pct).padStart(3)}% required:${r.completed || 0}/${r.total}`);
+  console.log(`${String(r.stage).padEnd(15)} ${String(pct).padStart(3)}% required:${r.completed || 0}/${r.total} avg_confidence:${r.avg_confidence || 0}`);
 }
 
 

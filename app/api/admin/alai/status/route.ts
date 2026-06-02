@@ -14,17 +14,18 @@ function exists(database: Database.Database, table: string) {
 
 function count(database: Database.Database, table: string, where = '1=1') {
   if (!exists(database, table)) return 0;
-  return Number(database.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE ${where}`).get().total || 0);
+  const row = database.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE ${where}`).get() as { total?: number } | undefined;
+  return Number(row?.total || 0);
 }
 
 export async function GET() {
   const database = db();
 
-  const control = database.prepare(`
+  const control = (database.prepare(`
     SELECT active_stage, mode, chat_priority_enabled
     FROM education_control
     WHERE id='main'
-  `).get() as any || { active_stage: 'UNKNOWN', mode: 'UNKNOWN', chat_priority_enabled: 0 };
+  `).get() as any) || { active_stage: 'UNKNOWN', mode: 'UNKNOWN', chat_priority_enabled: 0 };
 
   const stages = ['CHAT_PRIORITY','PREESCOLAR','PRIMARIA','PREMEDIA','MEDIA','UNIVERSIDAD','MAESTRIA','DOCTORADO','POST_DOCTORADO'];
 
@@ -63,11 +64,26 @@ export async function GET() {
     claim_verifications: count(database, 'claim_verifications'),
     knowledge_entities: count(database, 'knowledge_entities'),
     knowledge_edges: count(database, 'knowledge_edges'),
-    semantic_memory: count(database, 'semantic_memory')
+    semantic_memory: count(database, 'semantic_memory'),
+    mastery_progress: count(database, 'mastery_progress')
   };
 
+  const coverage = exists(database, 'education_required_coverage') && exists(database, 'mastery_progress')
+    ? database.prepare(`
+      SELECT c.stage,
+             COUNT(*) AS total,
+             SUM(CASE WHEN mp.completed=1 THEN 1 ELSE 0 END) AS completed,
+             ROUND(AVG(CASE WHEN mp.completed=1 THEN mp.confidence ELSE NULL END),2) AS avg_confidence
+      FROM education_required_coverage c
+      LEFT JOIN mastery_progress mp
+        ON mp.path = c.path
+      GROUP BY c.stage
+      ORDER BY c.stage
+    `).all()
+    : [];
+
   const confidence = exists(database, 'knowledge_units')
-    ? database.prepare(`SELECT ROUND(AVG(confidence),2) AS avg, MIN(confidence) AS min, MAX(confidence) AS max FROM knowledge_units`).get()
+    ? (database.prepare(`SELECT ROUND(AVG(confidence),2) AS avg, MIN(confidence) AS min, MAX(confidence) AS max FROM knowledge_units`).get() as any)
     : { avg: 0, min: 0, max: 0 };
 
   database.close();
@@ -79,6 +95,7 @@ export async function GET() {
     nodes,
     nextJobs,
     knowledge,
-    confidence
+    confidence,
+    coverage
   });
 }
