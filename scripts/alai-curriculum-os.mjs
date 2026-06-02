@@ -172,7 +172,7 @@ ON CONFLICT(id) DO UPDATE SET active_stage='PREESCOLAR', mode='education_first',
 `).run(now);
 
 const tmp = 'seed/alai.seed.db';
-db.backup(tmp);
+await db.backup(tmp);
 db.close();
 
 const input = fs.readFileSync(tmp);

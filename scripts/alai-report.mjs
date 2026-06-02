@@ -79,6 +79,25 @@ console.log('------------');
 console.log(`avg:${conf.avg || 0} min:${conf.min || 0} max:${conf.max || 0}`);
 
 console.log('');
+
+console.log('');
+console.log('📌 Cobertura obligatoria');
+console.log('-----------------------');
+for (const r of all(`
+SELECT c.stage,
+       COUNT(*) AS total,
+       SUM(CASE WHEN j.status='completed' THEN 1 ELSE 0 END) AS completed
+FROM education_required_coverage c
+LEFT JOIN learning_jobs j
+  ON j.topic LIKE '%' || c.path || '%'
+GROUP BY c.stage
+ORDER BY c.stage
+`)) {
+  const pct = r.total ? Math.round((Number(r.completed || 0) / Number(r.total)) * 100) : 0;
+  console.log(`${String(r.stage).padEnd(15)} ${String(pct).padStart(3)}% required:${r.completed || 0}/${r.total}`);
+}
+
+
 console.log('🔥 Próximos 20 aprendizajes');
 console.log('---------------------------');
 
