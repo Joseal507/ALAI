@@ -199,28 +199,36 @@ Reglas:
   const knowledge = normalizeKnowledgeUnit(parsed, cleanLearningTopic);
   saveKnowledge(knowledge);
 
-if (typeof knowledge !== 'undefined' && knowledge) {
-    const stmt = db.prepare(\`
-        INSERT INTO mastery_progress(id, stage, topic, subtopic, completed, confidence, verified, last_updated)
-        VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
-        ON CONFLICT(id) DO UPDATE SET
-            completed=excluded.completed,
-            confidence=excluded.confidence,
-            verified=excluded.verified,
-            last_updated=excluded.last_updated
-    \`);
-    stmt.run(
-        knowledge.id,
-        knowledge.stage || 'UNKNOWN',
-        knowledge.topic,
-        knowledge.subtopic || '',
-        1,
-        knowledge.confidence || 60,
-        0,
-        Date.now()
-    );
-}
+  db.prepare(
+    'CREATE TABLE IF NOT EXISTS mastery_progress (' +
+    'id TEXT PRIMARY KEY, ' +
+    'stage TEXT NOT NULL, ' +
+    'path TEXT NOT NULL, ' +
+    'topic TEXT NOT NULL, ' +
+    'completed INTEGER NOT NULL DEFAULT 0, ' +
+    'confidence INTEGER NOT NULL DEFAULT 0, ' +
+    'verified INTEGER NOT NULL DEFAULT 0, ' +
+    'updated_at INTEGER NOT NULL)'
+  ).run();
 
+  db.prepare(
+    'INSERT INTO mastery_progress ' +
+    '(id, stage, path, topic, completed, confidence, verified, updated_at) ' +
+    'VALUES (@id, @stage, @path, @topic, 1, @confidence, @verified, @updatedAt) ' +
+    'ON CONFLICT(id) DO UPDATE SET ' +
+    'completed = 1, ' +
+    'confidence = excluded.confidence, ' +
+    'verified = excluded.verified, ' +
+    'updated_at = excluded.updated_at'
+  ).run({
+    id: knowledge.id,
+    stage: meta.stage || 'POST_DOCTORADO',
+    path: meta.path || cleanLearningTopic,
+    topic: cleanLearningTopic,
+    confidence: knowledge.confidence,
+    verified: knowledge.confidence >= 85 ? 1 : 0,
+    updatedAt: Date.now(),
+  });
 
   await inferRelationshipsForKnowledge(knowledge);
 
