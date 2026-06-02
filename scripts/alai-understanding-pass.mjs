@@ -136,6 +136,43 @@ for (const c of claims) {
   verifications++;
 }
 
+
+const claimRowsForInference = db.prepare(`
+SELECT id, knowledge_id, subject, predicate, object, confidence
+FROM knowledge_claims
+ORDER BY updated_at DESC
+LIMIT 300
+`).all();
+
+const insertInference = db.prepare(`
+INSERT OR IGNORE INTO knowledge_inferences
+(id, claim_a, claim_b, subject, inference, confidence, created_at, updated_at)
+VALUES
+(@id, @claim_a, @claim_b, @subject, @inference, @confidence, @now, @now)
+`);
+
+for (let i = 0; i < claimRowsForInference.length; i++) {
+  for (let j = i + 1; j < Math.min(claimRowsForInference.length, i + 25); j++) {
+    const a = claimRowsForInference[i];
+    const b = claimRowsForInference[j];
+
+    if (canonical(a.subject) !== canonical(b.subject)) continue;
+    if (a.id === b.id) continue;
+
+    const inf = `${a.subject} conecta "${clean(a.object).slice(0, 90)}" con "${clean(b.object).slice(0, 90)}".`;
+
+    insertInference.run({
+      id: `inf_${canonical(a.id)}_${canonical(b.id)}`,
+      claim_a: a.id,
+      claim_b: b.id,
+      subject: a.subject,
+      inference: inf,
+      confidence: Math.min(Number(a.confidence || 60), Number(b.confidence || 60)),
+      now
+    });
+  }
+}
+
 const qualityUnits = db.prepare(`
 SELECT
   ku.id,
@@ -143,21 +180,30 @@ SELECT
   ku.confidence,
   COUNT(DISTINCT kc.id) AS claims,
   COUNT(DISTINCT cv.id) AS verified,
-  COUNT(DISTINCT ki.id) AS inferences,
   COUNT(DISTINCT kf.id) AS conflicts
 FROM knowledge_units ku
 LEFT JOIN knowledge_claims kc ON kc.knowledge_id = ku.id
 LEFT JOIN claim_verifications cv ON cv.claim_id = kc.id AND cv.verdict IN ('supported','needs_review','weak')
-LEFT JOIN knowledge_inferences ki ON ki.knowledge_id = ku.id
 LEFT JOIN knowledge_conflicts kf ON kf.knowledge_a = ku.id OR kf.knowledge_b = ku.id
 GROUP BY ku.id
 `).all();
+
+const inferenceCountBySubject = new Map();
+const infRows = db.prepare(`
+SELECT subject, COUNT(*) total
+FROM knowledge_inferences
+GROUP BY subject
+`).all();
+
+for (const r of infRows) {
+  inferenceCountBySubject.set(canonical(r.subject), Number(r.total || 0));
+}
 
 for (const q of qualityUnits) {
   const confidence = Number(q.confidence || 60);
   const claimScore = Math.min(20, Number(q.claims || 0) * 4);
   const verifyScore = Math.min(25, Number(q.verified || 0) * 5);
-  const inferenceScore = Math.min(10, Number(q.inferences || 0) * 2);
+  const inferenceScore = Math.min(10, (inferenceCountBySubject.get(canonical(q.title)) || 0) * 2);
   const conflictPenalty = Math.min(30, Number(q.conflicts || 0) * 10);
 
   const score = Math.max(0, Math.min(100,
@@ -170,7 +216,7 @@ for (const q of qualityUnits) {
     title: q.title,
     claims: Number(q.claims || 0),
     verified: Number(q.verified || 0),
-    inferences: Number(q.inferences || 0),
+    inferences: inferenceCountBySubject.get(canonical(q.title)) || 0,
     conflicts: Number(q.conflicts || 0),
     confidence,
     score,
@@ -220,6 +266,7 @@ console.log(JSON.stringify({
   entities_total: db.prepare("SELECT COUNT(*) total FROM knowledge_entities").get().total,
   verifications_attempted: verifications,
   verifications_total: db.prepare("SELECT COUNT(*) total FROM claim_verifications").get().total,
+  inferences_total: db.prepare("SELECT COUNT(*) total FROM knowledge_inferences").get().total,
   quality_rows: qualityRows,
   conflicts_attempted: conflicts,
   conflicts_total: db.prepare("SELECT COUNT(*) total FROM knowledge_conflicts").get().total
