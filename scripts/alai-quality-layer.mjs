@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS reinforcement_queue (
 `);
 
 const units = db.prepare(`
-SELECT id, title, confidence
+SELECT id, title, confidence, stage, curriculum_path, education_node_id
 FROM knowledge_units
 `).all();
 
@@ -55,6 +55,11 @@ INSERT OR IGNORE INTO reinforcement_queue
 VALUES
 (@id, @stage, @topic, @reason, @priority, 'pending', @now, @now)
 `);
+
+function inferStageFromUnit(u) {
+  if (u.stage && u.stage !== 'UNKNOWN') return u.stage;
+  if (u.curriculum_path) return String(u.curriculum_path).split('/')[0] || 'UNKNOWN';
+  if (u.education_node_id) return String(u.education_node_id).split('/')[0] || 'UNKNOWN';
 
 function inferStage(title) {
   const s = String(title || '');
@@ -86,8 +91,8 @@ for (const u of units) {
     verification_score * 0.2
   );
 
-  const needs_reinforcement = quality_score < 85 || confidence < 85 ? 1 : 0;
-  const stage = inferStage(u.title);
+  const needs_reinforcement = quality_score < 75 || confidence < 75 ? 1 : 0;
+  const stage = inferStageFromUnit(u);
 
   insertQuality.run({
     id: `kq_${u.id}`,
