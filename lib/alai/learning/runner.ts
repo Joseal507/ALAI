@@ -171,6 +171,19 @@ Reglas:
     enqueueLearningJob(related, Math.max(10, job.priority - 5));
   }
 
+  if (
+    cleanLearningTopic.includes('ALAI_EXPAND_NODE') ||
+    cleanLearningTopic.includes('ALAI_CURRICULUM_EXPAND') ||
+    cleanLearningTopic.includes('ALAI_LEARN_TOPIC')
+  ) {
+    for (const related of knowledge.relatedConcepts.slice(0, 12)) {
+      enqueueLearningJob(
+        `ALAI_LEARN_TOPIC | stage=${job.stage || 'POST_DOCTORADO'} | parent=${cleanLearningTopic.slice(0, 180)} | target=${related} | mastery_required=90 | task=Learn this discovered child topic completely.`,
+        Math.max(20, job.priority - 1)
+      );
+    }
+  }
+
   job.status = 'completed';
   markLearningJobStatus(job.id, 'completed');
   completeMissionForTopic(job.topic);

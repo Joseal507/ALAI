@@ -15,6 +15,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function runLocalScript(command) {
+  const { execSync } = await import('node:child_process');
+  try {
+    const out = execSync(command, { stdio: 'pipe', encoding: 'utf8' });
+    return out.trim();
+  } catch (err) {
+    return String(err?.stdout || err?.message || err);
+  }
+}
+
 async function jsonFetch(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -163,6 +173,12 @@ async function main() {
 
         const focus = await applyFocus();
         console.log(`🎯 Domain focus → changed:${focus.changed || 0}`);
+
+        const expansion = await runLocalScript('npm run alai:expand');
+        console.log(`🌱 Auto expansion → ${expansion.split('\n').slice(-1)[0] || 'done'}`);
+
+        const gateRun = await runLocalScript('npm run alai:gate');
+        console.log(`🚪 Education gate → ${gateRun.split('\n').find(l => l.includes('active_stage')) || 'done'}`);
 
         const curriculum = await rebuildCurriculum();
         console.log(`📚 Curriculum rebuild → updated:${curriculum.updated || 0}`);
