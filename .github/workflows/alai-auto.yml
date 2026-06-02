@@ -60,6 +60,12 @@ jobs:
           mkdir -p logs data seed
           gzip -dc seed/alai.seed.db.gz > data/alai.db
 
+      - name: Apply education autoplanner
+        run: python3 scripts/education-autoplanner.py
+
+      - name: Apply education gate
+        run: python3 scripts/education-gate.py
+
       - name: Start server
         run: |
           npm run dev -- -p 6969 > logs/server-boot.log 2>&1 &
