@@ -1,3 +1,4 @@
+import { buildSourceContext } from '../sources/sourceContext';
 import { safeJsonParse, buildFallbackKnowledge } from '../utils/jsonRepair';
 import { askMultipleTeachers } from '../teachers/studyai';
 import { createLearningJob, normalizeKnowledgeUnit } from './jobs';
@@ -70,8 +71,15 @@ export async function runLearningCycle(topic?: string) {
     message: 'Learning job started',
   });
 
+  const sourcePack = buildSourceContext(cleanLearningTopic);
   const research = await researchTopic(cleanLearningTopic);
-  const researchContext = formatResearchForPrompt(research);
+  const researchContext = [
+    'REAL SOURCES CONTEXT:',
+    sourcePack.context,
+    '',
+    'WEB RESEARCH CONTEXT:',
+    formatResearchForPrompt(research)
+  ].join('\n');
 
   const teacherResults = await askMultipleTeachers({
     temperature: 0.22,
