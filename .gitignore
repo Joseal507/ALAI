@@ -10,3 +10,5 @@ data/*.db-*
 .DS_Store
 alai-core@*
 node
+next-env.d.ts
+tsconfig.tsbuildinfo
