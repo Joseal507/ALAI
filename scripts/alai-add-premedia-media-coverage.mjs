@@ -3,19 +3,6 @@ import Database from 'better-sqlite3';
 const db = new Database('data/alai.db');
 const now = Date.now();
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS education_required_coverage (
-  id TEXT PRIMARY KEY,
-  stage TEXT NOT NULL,
-  path TEXT NOT NULL UNIQUE,
-  topic TEXT NOT NULL,
-  completed INTEGER NOT NULL DEFAULT 0,
-  confidence INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-`);
-
 const topics = [
   ['PREMEDIA','Matemáticas','Números y álgebra','enteros'],
   ['PREMEDIA','Matemáticas','Números y álgebra','fracciones y decimales'],
@@ -51,8 +38,8 @@ const topics = [
 
 const insertCoverage = db.prepare(`
 INSERT OR IGNORE INTO education_required_coverage
-(id, stage, path, topic, completed, confidence, created_at, updated_at)
-VALUES (@id, @stage, @path, @topic, 0, 0, @now, @now)
+(id, stage, path, required, mastery_required, created_at, updated_at)
+VALUES (@id, @stage, @path, 1, 90, @now, @now)
 `);
 
 const insertJob = db.prepare(`
@@ -69,19 +56,19 @@ function slug(s) {
     .slice(0, 80);
 }
 
-for (const [stage, subject, unit, topic] of topics) {
-  const path = `${stage}/${subject}/${unit}/${topic}`;
-  const id = `${stage}_${slug(subject)}_${slug(unit)}_${slug(topic)}`;
+for (const [stage, subject, unit, topicName] of topics) {
+  const path = `${stage}/${subject}/${unit}/${topicName}`;
+  const id = `cov_${stage}_${slug(subject)}_${slug(unit)}_${slug(topicName)}`;
   const priority = stage === 'PREMEDIA' ? 180000 : 170000;
 
-  insertCoverage.run({ id, stage, path, topic, now });
+  insertCoverage.run({ id, stage, path, now });
 
   insertJob.run({
     id: `job_${id}`,
     stage,
     priority,
     now,
-    topic: `ALAI_LEARN_TOPIC | stage=${stage} | path=${path} | target=${topic} | mastery_required=90 | task=Learn this exact required topic completely, with explanation, examples, mistakes, exercises, prerequisites, and assessment.`
+    topic: `ALAI_LEARN_TOPIC | stage=${stage} | path=${path} | target=${topicName} | mastery_required=90 | task=Learn this exact required topic completely, with explanation, examples, mistakes, exercises, prerequisites, and assessment.`
   });
 }
 
