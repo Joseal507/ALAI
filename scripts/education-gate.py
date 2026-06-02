@@ -19,16 +19,20 @@ STAGES = [
 conn = sqlite3.connect(DB)
 cur = conn.cursor()
 
-for col, default in [("stage", "'POST_DOCTORADO'"), ("base_priority", "0")]:
-    cols = [r[1] for r in cur.execute("PRAGMA table_info(learning_jobs)").fetchall()]
-    if col not in cols:
-        cur.execute(f"ALTER TABLE learning_jobs ADD COLUMN {col} TEXT DEFAULT {default}" if col == "stage" else f"ALTER TABLE learning_jobs ADD COLUMN {col} INTEGER DEFAULT {default}")
+cols = [r[1] for r in cur.execute("PRAGMA table_info(learning_jobs)").fetchall()]
+if "stage" not in cols:
+    cur.execute("ALTER TABLE learning_jobs ADD COLUMN stage TEXT DEFAULT 'POST_DOCTORADO'")
+if "base_priority" not in cols:
+    cur.execute("ALTER TABLE learning_jobs ADD COLUMN base_priority INTEGER DEFAULT 0")
+if "source" not in cols:
+    cur.execute("ALTER TABLE learning_jobs ADD COLUMN source TEXT DEFAULT 'auto'")
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS education_control (
   id TEXT PRIMARY KEY,
   active_stage TEXT NOT NULL,
-  mode TEXT NOT NULL DEFAULT 'education_first',
+  mode TEXT NOT NULL,
+  chat_priority_enabled INTEGER NOT NULL DEFAULT 1,
   updated_at INTEGER NOT NULL
 )
 """)
@@ -56,19 +60,22 @@ for stage, base in STAGES:
     SELECT COUNT(*) FROM learning_jobs
     WHERE stage=? AND status!='completed'
     """, (stage,)).fetchone()[0]
+
     if remaining > 0:
         active_stage = stage
         break
+
+base_map = dict(STAGES)
 
 cur.execute("""
 UPDATE learning_jobs
 SET priority=CASE WHEN base_priority > 0 THEN base_priority ELSE ? END, updated_at=?
 WHERE stage=? AND status='pending'
-""", (dict(STAGES)[active_stage], now, active_stage))
+""", (base_map.get(active_stage, 50000), now, active_stage))
 
 cur.execute("""
 UPDATE learning_jobs
-SET priority=999999, stage='CHAT_PRIORITY', updated_at=?
+SET priority=999999, stage='CHAT_PRIORITY', source='chat', updated_at=?
 WHERE status='pending'
 AND (
   topic LIKE 'CHAT_REQUEST |%'
@@ -77,11 +84,13 @@ AND (
 """, (now,))
 
 cur.execute("""
-INSERT INTO education_control (id, active_stage, mode, updated_at)
-VALUES ('main', ?, 'education_first', ?)
+INSERT INTO education_control
+(id, active_stage, mode, chat_priority_enabled, updated_at)
+VALUES ('main', ?, 'education_first', 1, ?)
 ON CONFLICT(id) DO UPDATE SET
 active_stage=excluded.active_stage,
 mode='education_first',
+chat_priority_enabled=1,
 updated_at=excluded.updated_at
 """, (active_stage, now))
 
@@ -89,7 +98,7 @@ conn.commit()
 
 print("=== ALAI EDUCATION GATE ===")
 print("active_stage:", active_stage)
-print("Top pending:")
+
 for row in cur.execute("""
 SELECT stage, topic, priority
 FROM learning_jobs

@@ -14,7 +14,8 @@
     "learn:cloud": "node scripts/learn-loop.mjs",
     "alai:report": "node scripts/alai-report.mjs",
     "alai:curriculum": "node scripts/alai-curriculum-os.mjs",
-    "alai:gate": "python3 scripts/education-gate.py"
+    "alai:gate": "python3 scripts/education-gate.py",
+    "alai:reset-zero": "node scripts/alai-reset-zero.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",

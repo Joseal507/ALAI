@@ -4,6 +4,7 @@ import { formatRagContext } from '../rag/search';
 import { hybridSearch } from '../rag/hybrid';
 import { semanticSearch } from '../memory/semantic';
 import { createResearchMission } from '../agents/research-planner';
+import { enqueueLearningJob } from '../learning/queue';
 import { extractLearningTopic } from '../agents/topic-extractor';
 import type { AlaiChatInput, AlaiChatResult, AlaiMessage } from '../types';
 
@@ -44,6 +45,8 @@ export async function runAlaiChat(input: AlaiChatInput): Promise<AlaiChatResult>
       'Created from chat because ALAI did not find strong enough memory.',
       999
     );
+
+    enqueueLearningJob(`CHAT_REQUEST | ${topic}`, 999999);
 
     learningTriggered = true;
   }
