@@ -107,12 +107,23 @@ async function callOpenAICompatible(args: {
     baseURL: args.baseURL,
   });
 
-  const res = await client.chat.completions.create({
+  const wantsJson = args.messages.some((m) =>
+    String(m.content || '').toLowerCase().includes('solo json válido') ||
+    String(m.content || '').toLowerCase().includes('solo json valido')
+  );
+
+  const payload: any = {
     model: args.model,
     messages: args.messages,
     temperature: args.temperature ?? 0.7,
     max_tokens: args.maxTokens ?? 2048,
-  });
+  };
+
+  if (wantsJson && args.provider !== 'sambanova') {
+    payload.response_format = { type: 'json_object' };
+  }
+
+  const res = await client.chat.completions.create(payload);
 
   const text = res.choices[0]?.message?.content || '';
   if (!text.trim()) throw new Error(`${args.provider} empty response`);
@@ -150,7 +161,18 @@ export async function askTeachers(params: {
   const candidates = getTeacherCandidates();
 
   if (!candidates.length) {
-    throw new Error('No AI teachers configured');
+    
+if (
+  PROVIDER_KEYS.groq.length ||
+  PROVIDER_KEYS.mistral.length ||
+  PROVIDER_KEYS.cerebras.length ||
+  PROVIDER_KEYS.sambanova.length
+) {
+  blocked.clear();
+} else {
+  throw new Error('No AI teachers configured');
+}
+
   }
 
   let lastError: unknown;
@@ -167,7 +189,7 @@ export async function askTeachers(params: {
       lastError = err;
 
       if (shouldBlock(err)) {
-        blocked.set(c.apiKey, Date.now() + 10 * 60 * 1000);
+        blocked.set(c.apiKey, Date.now() + 60 * 1000);
       }
 
       continue;
@@ -187,7 +209,18 @@ export async function askMultipleTeachers(params: {
   const results: TeacherResult[] = [];
 
   if (!candidates.length) {
-    throw new Error('No AI teachers configured');
+    
+if (
+  PROVIDER_KEYS.groq.length ||
+  PROVIDER_KEYS.mistral.length ||
+  PROVIDER_KEYS.cerebras.length ||
+  PROVIDER_KEYS.sambanova.length
+) {
+  blocked.clear();
+} else {
+  throw new Error('No AI teachers configured');
+}
+
   }
 
   for (const c of candidates) {
@@ -204,7 +237,7 @@ export async function askMultipleTeachers(params: {
       results.push(result);
     } catch (err: any) {
       if (shouldBlock(err)) {
-        blocked.set(c.apiKey, Date.now() + 10 * 60 * 1000);
+        blocked.set(c.apiKey, Date.now() + 60 * 1000);
       }
 
       continue;
