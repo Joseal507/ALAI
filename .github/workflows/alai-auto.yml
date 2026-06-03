@@ -123,7 +123,7 @@ jobs:
       - name: Run autonomous learning
         run: |
           echo "===== LEARN CLOUD START ====="
-          timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log || true
+          timeout 3m npm run learn:cloud 2>&1 | tee logs/server.log || true
           echo "===== LEARN CLOUD END ====="
 
       - name: Run research brain
