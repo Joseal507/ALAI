@@ -13,6 +13,8 @@ function clean(raw) {
   s = s.replace(/^concept:\s*/i, '');
   s = s.replace(/^name:\s*/i, '');
   s = s.replace(/^nombre:\s*/i, '');
+  s = s.replace(/^target=name:\s*/i, '');
+  s = s.replace(/^target=nombre:\s*/i, '');
 
   s = s.split(/\s+(description|descripcion|relation|relacion|path|task|reason|mastery_required):/i)[0].trim();
   s = s.split(/\s+\|\s+/)[0].trim();
@@ -77,32 +79,25 @@ for (const job of completed) {
 
   if (existing) {
     const sql = hasUpdatedAt
-      ? `UPDATE mastery_progress SET confidence=MAX(confidence, ?), updated_at=? WHERE path=?`
-      : `UPDATE mastery_progress SET confidence=MAX(confidence, ?) WHERE path=?`;
+      ? `UPDATE mastery_progress SET confidence=MAX(confidence, ?), completed=CASE WHEN MAX(confidence, ?) >= 90 THEN 1 ELSE completed END, verified=CASE WHEN MAX(confidence, ?) >= 90 THEN 1 ELSE verified END, updated_at=? WHERE path=?`
+      : `UPDATE mastery_progress SET confidence=MAX(confidence, ?), completed=CASE WHEN MAX(confidence, ?) >= 90 THEN 1 ELSE completed END, verified=CASE WHEN MAX(confidence, ?) >= 90 THEN 1 ELSE verified END WHERE path=?`;
 
-    if (hasUpdatedAt) db.prepare(sql).run(confidence, now, path);
-    else db.prepare(sql).run(confidence, path);
+    if (hasUpdatedAt) db.prepare(sql).run(confidence, confidence, confidence, now, path);
+    else db.prepare(sql).run(confidence, confidence, confidence, path);
   } else {
-    const cols = ['id', 'path', 'confidence'];
-    const vals = ['@id', '@path', '@confidence'];
-
-    if (hasCreatedAt) {
-      cols.push('created_at');
-      vals.push('@now');
-    }
-
-    if (hasUpdatedAt) {
-      cols.push('updated_at');
-      vals.push('@now');
-    }
-
     db.prepare(`
-      INSERT INTO mastery_progress (${cols.join(', ')})
-      VALUES (${vals.join(', ')})
+      INSERT INTO mastery_progress
+      (id, stage, path, topic, completed, confidence, verified, updated_at)
+      VALUES
+      (@id, @stage, @path, @topic, @completed, @confidence, @verified, @now)
     `).run({
       id: safeId(path),
+      stage: job.stage || String(path).split('/')[0] || 'UNKNOWN',
       path,
+      topic: target,
+      completed: confidence >= 90 ? 1 : 0,
       confidence,
+      verified: confidence >= 90 ? 1 : 0,
       now
     });
   }
