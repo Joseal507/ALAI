@@ -55,6 +55,7 @@ metric('before_weak_required', scalar(`
 `));
 
 const steps = [
+  ['him_upgrade', 'scripts/alai-him-upgrade.mjs'],
   ['hygiene', 'scripts/alai-phase1-hygiene.mjs'],
   ['research_missions', 'scripts/alai-research-mission-engine.mjs'],
   ['source_harvest', 'scripts/alai-source-harvester.mjs'],
