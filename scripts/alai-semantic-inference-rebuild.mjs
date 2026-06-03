@@ -22,28 +22,9 @@ function norm(s = '') {
     .slice(0, 140);
 }
 
-const rules = {
-  depends_on: {
-    result: 'indirectly_depends_on',
-    text: (a, b, c) => `${a} depende indirectamente de ${c} porque depende de ${b}, y ${b} también depende de ${c}.`
-  },
-  part_of: {
-    result: 'contributes_to',
-    text: (a, b, c) => `${a} contribuye a ${c} porque forma parte de ${b}, y ${b} forma parte de ${c}.`
-  },
-  prerequisite_of: {
-    result: 'indirect_prerequisite_of',
-    text: (a, b, c) => `${a} es prerequisito indirecto de ${c} porque prepara para ${b}, y ${b} prepara para ${c}.`
-  },
-  causes: {
-    result: 'may_cause',
-    text: (a, b, c) => `${a} puede causar indirectamente ${c} porque causa ${b}, y ${b} causa ${c}.`
-  },
-  includes: {
-    result: 'contains_nested_concept',
-    text: (a, b, c) => `${a} contiene indirectamente ${c} porque incluye ${b}, y ${b} incluye ${c}.`
-  }
-};
+function nice(s = '') {
+  return String(s || '').trim();
+}
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS semantic_inference_log (
@@ -59,24 +40,37 @@ CREATE TABLE IF NOT EXISTS semantic_inference_log (
 );
 `);
 
-const structured = db.prepare(`
-SELECT id, title, subject, predicate, object, confidence
-FROM knowledge_claims
-WHERE predicate IN ('depends_on','part_of','prerequisite_of','causes','includes')
+const rels = db.prepare(`
+SELECT
+  id,
+  source_title,
+  target_title,
+  relationship,
+  reason,
+  confidence
+FROM knowledge_relationships
+WHERE relationship IN (
+  'prerequisite_of',
+  'depends_on',
+  'specialization_of',
+  'application_of',
+  'example_of'
+)
 `).all();
 
-let inserted = 0;
-let skipped = 0;
+const byType = new Map();
 
-const byPredicate = new Map();
-
-for (const c of structured) {
-  const p = c.predicate;
-  if (!byPredicate.has(p)) byPredicate.set(p, []);
-  byPredicate.get(p).push({
-    ...c,
-    s: norm(c.subject),
-    o: norm(c.object)
+for (const r of rels) {
+  const type = r.relationship;
+  if (!byType.has(type)) byType.set(type, []);
+  byType.get(type).push({
+    id: r.id,
+    source: nice(r.source_title),
+    target: nice(r.target_title),
+    s: norm(r.source_title),
+    t: norm(r.target_title),
+    relationship: type,
+    confidence: Math.round(Number(r.confidence || 0.75) * 100)
   });
 }
 
@@ -94,112 +88,156 @@ VALUES
 (@id, @rule, @a, @b, @c, @inference, @confidence, @now, @now)
 `);
 
-for (const [predicate, claims] of byPredicate.entries()) {
-  const rule = rules[predicate];
-  if (!rule) continue;
+function addInference({ id, claimA, claimB, subject, rule, a, b, c, inference, confidence }) {
+  insertInference.run({
+    id,
+    claim_a: claimA,
+    claim_b: claimB,
+    subject,
+    inference,
+    confidence,
+    now
+  });
 
-  for (const a of claims) {
-    for (const b of claims) {
-      if (a.id === b.id) continue;
-      if (!a.o || !b.s) continue;
-      if (a.o !== b.s) continue;
-      if (a.s === b.o) {
-        skipped++;
-        continue;
-      }
+  insertLog.run({
+    id,
+    rule,
+    a,
+    b,
+    c,
+    inference,
+    confidence,
+    now
+  });
+}
 
-      const confidence = Math.min(95, Math.round((Number(a.confidence || 70) + Number(b.confidence || 70)) / 2));
-      const inference = rule.text(a.s, a.o, b.o);
-      const id = `sem_${safe(predicate)}_${safe(a.s)}_${safe(a.o)}_${safe(b.o)}`;
+let attempted = 0;
+let cyclesSkipped = 0;
 
-      insertInference.run({
-        id,
-        claim_a: a.id,
-        claim_b: b.id,
-        subject: a.s,
-        inference,
-        confidence,
-        now
-      });
-
-      insertLog.run({
-        id,
-        rule: rule.result,
-        a: a.s,
-        b: a.o,
-        c: b.o,
-        inference,
-        confidence,
-        now
-      });
-
-      inserted++;
+// Rule 1: prerequisite chain
+for (const a of byType.get('prerequisite_of') || []) {
+  for (const b of byType.get('prerequisite_of') || []) {
+    if (a.id === b.id) continue;
+    if (a.t !== b.s) continue;
+    if (a.s === b.t) {
+      cyclesSkipped++;
+      continue;
     }
+
+    const confidence = Math.min(95, Math.round((a.confidence + b.confidence) / 2));
+    const inference = `${a.source} es prerequisito indirecto de ${b.target} porque prepara para ${a.target}, y ${a.target} prepara para ${b.target}.`;
+
+    addInference({
+      id: `sem_prereq_${safe(a.s)}_${safe(a.t)}_${safe(b.t)}`,
+      claimA: a.id,
+      claimB: b.id,
+      subject: a.s,
+      rule: 'indirect_prerequisite_of',
+      a: a.source,
+      b: a.target,
+      c: b.target,
+      inference,
+      confidence
+    });
+
+    attempted++;
   }
 }
 
-// Also infer from knowledge_relationships because they are cleaner than old claim text.
-const rels = db.prepare(`
-SELECT source_name, target_name, relation_type, confidence
-FROM knowledge_relationships
-WHERE relation_type IN ('depends_on','prerequisite_of','specialization_of','application_of')
-`).all();
-
-const relClaims = rels.map((r, idx) => ({
-  id: `rel_${idx}_${safe(r.source_name)}_${safe(r.relation_type)}_${safe(r.target_name)}`,
-  s: norm(r.source_name),
-  o: norm(r.target_name),
-  predicate: r.relation_type,
-  confidence: Math.round(Number(r.confidence || 0.75) * 100)
-}));
-
-for (const type of ['depends_on', 'prerequisite_of']) {
-  const claims = relClaims.filter(r => r.predicate === type);
-  const rule = rules[type];
-  if (!rule) continue;
-
-  for (const a of claims) {
-    for (const b of claims) {
-      if (a.id === b.id) continue;
-      if (a.o !== b.s) continue;
-      if (a.s === b.o) continue;
-
-      const confidence = Math.min(95, Math.round((a.confidence + b.confidence) / 2));
-      const inference = rule.text(a.s, a.o, b.o);
-      const id = `sem_rel_${safe(type)}_${safe(a.s)}_${safe(a.o)}_${safe(b.o)}`;
-
-      insertInference.run({
-        id,
-        claim_a: a.id,
-        claim_b: b.id,
-        subject: a.s,
-        inference,
-        confidence,
-        now
-      });
-
-      insertLog.run({
-        id,
-        rule: rule.result,
-        a: a.s,
-        b: a.o,
-        c: b.o,
-        inference,
-        confidence,
-        now
-      });
-
-      inserted++;
+// Rule 2: dependency chain
+for (const a of byType.get('depends_on') || []) {
+  for (const b of byType.get('depends_on') || []) {
+    if (a.id === b.id) continue;
+    if (a.t !== b.s) continue;
+    if (a.s === b.t) {
+      cyclesSkipped++;
+      continue;
     }
+
+    const confidence = Math.min(95, Math.round((a.confidence + b.confidence) / 2));
+    const inference = `${a.source} depende indirectamente de ${b.target} porque depende de ${a.target}, y ${a.target} depende de ${b.target}.`;
+
+    addInference({
+      id: `sem_dep_${safe(a.s)}_${safe(a.t)}_${safe(b.t)}`,
+      claimA: a.id,
+      claimB: b.id,
+      subject: a.s,
+      rule: 'indirectly_depends_on',
+      a: a.source,
+      b: a.target,
+      c: b.target,
+      inference,
+      confidence
+    });
+
+    attempted++;
+  }
+}
+
+// Rule 3: specialization inheritance
+for (const a of byType.get('specialization_of') || []) {
+  for (const b of byType.get('application_of') || []) {
+    if (a.t !== b.s) continue;
+    if (a.s === b.t) continue;
+
+    const confidence = Math.min(92, Math.round((a.confidence + b.confidence) / 2));
+    const inference = `${a.source} puede heredar aplicaciones de ${a.target}; si ${a.target} se aplica en ${b.target}, entonces ${a.source} puede relacionarse con ${b.target}.`;
+
+    addInference({
+      id: `sem_spec_app_${safe(a.s)}_${safe(a.t)}_${safe(b.t)}`,
+      claimA: a.id,
+      claimB: b.id,
+      subject: a.s,
+      rule: 'inherits_application',
+      a: a.source,
+      b: a.target,
+      c: b.target,
+      inference,
+      confidence
+    });
+
+    attempted++;
+  }
+}
+
+// Rule 4: example supports concept
+for (const a of byType.get('example_of') || []) {
+  for (const b of byType.get('application_of') || []) {
+    if (a.t !== b.s) continue;
+    if (a.s === b.t) continue;
+
+    const confidence = Math.min(90, Math.round((a.confidence + b.confidence) / 2));
+    const inference = `${a.source} puede servir como ejemplo aplicado de ${b.target} porque ejemplifica ${a.target}, y ${a.target} se aplica en ${b.target}.`;
+
+    addInference({
+      id: `sem_example_app_${safe(a.s)}_${safe(a.t)}_${safe(b.t)}`,
+      claimA: a.id,
+      claimB: b.id,
+      subject: a.s,
+      rule: 'example_supports_application',
+      a: a.source,
+      b: a.target,
+      c: b.target,
+      inference,
+      confidence
+    });
+
+    attempted++;
   }
 }
 
 console.log(JSON.stringify({
-  structured_claims_used: structured.length,
-  semantic_inferences_attempted: inserted,
-  skipped_cycles: skipped,
+  relationships_used: rels.length,
+  semantic_inferences_attempted: attempted,
+  cycles_skipped: cyclesSkipped,
   semantic_log_total: db.prepare("SELECT COUNT(*) total FROM semantic_inference_log").get().total,
   total_inferences: db.prepare("SELECT COUNT(*) total FROM knowledge_inferences").get().total,
+  by_rule: db.prepare(`
+    SELECT rule, COUNT(*) total, ROUND(AVG(confidence),2) avg_confidence
+    FROM semantic_inference_log
+    GROUP BY rule
+    ORDER BY total DESC
+  `).all(),
   samples: db.prepare(`
     SELECT rule, subject_a, bridge_b, object_c, confidence
     FROM semantic_inference_log
