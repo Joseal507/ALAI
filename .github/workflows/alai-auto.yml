@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [alai-auto-loop]
+  schedule:
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: alai-auto-learning
@@ -15,90 +18,98 @@ concurrency:
 jobs:
   learn:
     runs-on: ubuntu-latest
-    timeout-minutes: 16
+    timeout-minutes: 25
 
     env:
-      LEARN_MODE: cloud
-      LEARN_MAX_CYCLES: 1
-      LEARN_MAX_MINUTES: 15
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
-      GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
-      GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
-      GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
-      GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
-      GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
-      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
-      CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
-      CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
-      CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
-      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
-      SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
-      SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
-      SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
-      SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
-      HF_API_KEY: ${{ secrets.HF_API_KEY }}
-      HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
-      HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
-      HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
-      HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      NODE_ENV: production
+      ALAI_AUTO: "true"
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          node-version: 22
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
           cache: npm
 
-      - run: npm ci
+      - name: Install
+        run: npm ci
 
-      - name: Prepare DB
+      - name: Prepare logs
+        run: mkdir -p logs
+
+      - name: Snapshot before
         run: |
-          mkdir -p logs data seed
-          gzip -dc seed/alai.seed.db.gz > data/alai.db
+          echo "===== BEFORE SNAPSHOT ====="
+          node scripts/alai-delta-real.mjs | tee logs/before-delta.log || true
+          echo
+          echo "===== BEFORE REPORT ====="
+          npm run alai:report | tee logs/before-report.log || true
 
-      - name: Apply education autoplanner
-        run: python3 scripts/education-autoplanner.py
-
-      - name: Apply education gate
-        run: python3 scripts/education-gate.py
-
-      - name: Apply Curriculum OS
-        run: npm run alai:curriculum
-
-      - name: Apply Education Gate
-        run: npm run alai:gate
-
-      - name: Start server
+      - name: Run autonomous learning
         run: |
-          npm run dev -- -p 6969 > logs/server-boot.log 2>&1 &
-          sleep 20
-          curl -f http://localhost:6969/api/health
-
-      - name: Learn
-        run: |
+          echo "===== LEARN CLOUD START ====="
           timeout 15m npm run learn:cloud 2>&1 | tee logs/server.log || true
+          echo "===== LEARN CLOUD END ====="
 
-      - name: Schedule next run
+      - name: Run research brain
+        run: |
+          echo "===== RESEARCH BRAIN ====="
+          node scripts/alai-research-brain.mjs 2>&1 | tee logs/research-brain.log || true
+
+      - name: Snapshot after
+        run: |
+          echo "===== AFTER DELTA ====="
+          node scripts/alai-delta-real.mjs | tee logs/after-delta.log || true
+          echo
+          echo "===== AFTER REPORT ====="
+          npm run alai:report | tee logs/after-report.log || true
+
+      - name: Build
+        run: |
+          echo "===== BUILD ====="
+          npm run build 2>&1 | tee logs/build.log
+
+      - name: Git status
+        run: |
+          echo "===== GIT STATUS ====="
+          git status --short | tee logs/git-status.log
+          echo
+          echo "===== GIT DIFF STAT ====="
+          git diff --stat | tee logs/git-diff-stat.log || true
+
+      - name: Commit learning artifacts
+        run: |
+          git config user.name "alai-bot"
+          git config user.email "alai-bot@users.noreply.github.com"
+
+          git add data/alai.db logs/*.log || true
+
+          if git diff --cached --quiet; then
+            echo "No learning changes to commit." | tee logs/commit.log
+          else
+            git commit -m "chore: autonomous ALAI learning update" | tee logs/commit.log
+            git pull --rebase origin main
+            git push origin main | tee -a logs/commit.log
+          fi
+
+      - name: Upload learning logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: alai-learning-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 7
+
+      - name: Trigger next loop
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HOUR=$(TZ=America/Panama date +%H)
-          if [ "$HOUR" -ge 9 ] && [ "$HOUR" -le 21 ]; then
-            echo "Waiting 2 minutes before next autonomous run..."
-            sleep 120
-            gh api repos/${{ github.repository }}/dispatches -f event_type=alai-auto-loop
-          else
-            echo "Outside learning window. Auto-loop stopped."
-          fi
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: alai-auto-logs
-          path: logs/
+          echo "===== RE-DISPATCH ====="
+          gh api repos/${{ github.repository }}/dispatches \
+            -f event_type=alai-auto-loop
