@@ -156,28 +156,17 @@ Reglas:
   });
 
   const primary = teacherResults[0];
-  const parsed = extractJson(primary.text);
+  let parsed = safeJsonParse(primary.text) || extractJson(primary.text);
 
   if (!parsed) {
-    job.status = 'failed';
-    job.updatedAt = Date.now();
-    markLearningJobStatus(job.id, 'failed');
-    saveLearningEvent({
-      eventType: 'failed',
-      topic: cleanLearningTopic,
-      message: 'Teacher returned invalid JSON',
-    });
+    parsed = buildFallbackKnowledge(cleanLearningTopic, primary.text);
 
-    return {
-      success: false,
-      job,
-      provider: primary.provider,
-      model: primary.model,
-      research,
-      teacherResults,
-      error: 'Teacher returned invalid JSON',
-      raw: primary.text,
-    };
+    saveLearningEvent({
+      eventType: 'json_repaired',
+      topic: cleanLearningTopic,
+      message: 'Teacher returned invalid JSON; fallback knowledge created',
+      confidence: 60,
+    });
   }
 
   const verification = await verifyKnowledgeDraft({
