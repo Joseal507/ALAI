@@ -22,7 +22,7 @@ jobs:
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      NODE_ENV: production
+      NODE_ENV: development
       ALAI_AUTO: "true"
 
     steps:
