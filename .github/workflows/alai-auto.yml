@@ -40,8 +40,13 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Prepare logs
-        run: mkdir -p logs
+      - name: Prepare runtime
+        run: |
+          mkdir -p logs data
+          if [ ! -f data/alai.db ]; then
+            echo "No data/alai.db found. Creating empty runtime database path."
+            touch data/alai.db
+          fi
 
       - name: Snapshot before
         run: |
@@ -50,6 +55,25 @@ jobs:
           echo
           echo "===== BEFORE REPORT ====="
           npm run alai:report | tee logs/before-report.log || true
+
+      - name: Start ALAI server
+        run: |
+          echo "===== START SERVER ====="
+          npm run dev -- -p 6969 > logs/next-server.log 2>&1 &
+          echo $! > logs/next-server.pid
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:6969/api/health > /dev/null 2>&1; then
+              echo "ALAI server is ready."
+              exit 0
+            fi
+            echo "Waiting for ALAI server... $i"
+            sleep 2
+          done
+
+          echo "Server failed to become ready."
+          cat logs/next-server.log || true
+          exit 1
 
       - name: Run autonomous learning
         run: |
