@@ -2,8 +2,7 @@ name: ALAI Auto Learning
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [alai-auto-loop]
+  # repository_dispatch disabled while rebuilding ALAI safely
   schedule:
     - cron: "*/30 * * * *"
 
