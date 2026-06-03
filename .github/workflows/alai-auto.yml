@@ -76,6 +76,11 @@ jobs:
             touch data/alai.db
           fi
 
+      - name: Safety guard before
+        run: |
+          echo "===== SAFETY BEFORE ====="
+          node scripts/alai-safety-guard.mjs before | tee logs/safety-before.log
+
       - name: Snapshot before
         run: |
           echo "===== BEFORE SNAPSHOT ====="
@@ -126,6 +131,11 @@ jobs:
           echo "===== RESEARCH BRAIN ====="
           node scripts/alai-research-brain.mjs 2>&1 | tee logs/research-brain.log || true
 
+      - name: Safety guard after
+        run: |
+          echo "===== SAFETY AFTER ====="
+          node scripts/alai-safety-guard.mjs after | tee logs/safety-after.log
+
       - name: Snapshot after
         run: |
           echo "===== AFTER DELTA ====="
@@ -152,7 +162,7 @@ jobs:
           git config user.name "alai-bot"
           git config user.email "alai-bot@users.noreply.github.com"
 
-          git add -f data/alai.db logs/*.log || true
+          git add -f data/alai.db seed/alai.seed.db.gz 2>/dev/null || git add -f data/alai.db
 
           if git diff --cached --quiet; then
             echo "No learning changes to commit." | tee logs/commit.log
@@ -170,7 +180,7 @@ jobs:
           retention-days: 7
 
       - name: Trigger next loop
-        if: always()
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

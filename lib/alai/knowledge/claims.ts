@@ -107,8 +107,7 @@ export function extractClaimsForKnowledge(row: any) {
   const now = Date.now();
 
   let inserted = 0;
-
-  db.prepare(`DELETE FROM knowledge_claims WHERE knowledge_id = ?`).run(row.id);
+  const pending: any[] = [];
 
   for (const sentence of sentences) {
     const claim = extractFromSentence(title, sentence);
@@ -116,26 +115,41 @@ export function extractClaimsForKnowledge(row: any) {
 
     const id = `claim_${row.id}_${normalizeId(claim.subject)}_${claim.predicate}_${normalizeId(claim.object)}`;
 
-    db.prepare(`
+    pending.push({
+      id,
+      knowledge_id: row.id,
+      title,
+      subject: claim.subject,
+      predicate: claim.predicate,
+      object: claim.object,
+      confidence: Number(row.confidence || 60),
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  if (pending.length <= 0) {
+    return 0;
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM knowledge_claims WHERE knowledge_id = ?`).run(row.id);
+
+    const insert = db.prepare(`
       INSERT OR IGNORE INTO knowledge_claims (
         id, knowledge_id, title, subject, predicate, object,
         confidence, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      row.id,
-      title,
-      claim.subject,
-      claim.predicate,
-      claim.object,
-      Number(row.confidence || 60),
-      now,
-      now
-    );
+      VALUES (@id, @knowledge_id, @title, @subject, @predicate, @object, @confidence, @created_at, @updated_at)
+    `);
 
-    inserted++;
-  }
+    for (const claim of pending) {
+      insert.run(claim);
+      inserted++;
+    }
+  });
+
+  tx();
 
   return inserted;
 }
