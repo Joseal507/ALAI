@@ -121,7 +121,7 @@ jobs:
           git config user.name "alai-bot"
           git config user.email "alai-bot@users.noreply.github.com"
 
-          git add data/alai.db logs/*.log || true
+          git add -f data/alai.db logs/*.log || true
 
           if git diff --cached --quiet; then
             echo "No learning changes to commit." | tee logs/commit.log
