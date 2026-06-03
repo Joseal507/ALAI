@@ -25,6 +25,34 @@ jobs:
       NODE_ENV: development
       ALAI_AUTO: "true"
 
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+      GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+      GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+      GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+      GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+      GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
+
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
+      CEREBRAS_API_KEY_3: ${{ secrets.CEREBRAS_API_KEY_3 }}
+      CEREBRAS_API_KEY_4: ${{ secrets.CEREBRAS_API_KEY_4 }}
+      CEREBRAS_API_KEY_5: ${{ secrets.CEREBRAS_API_KEY_5 }}
+
+      HF_API_KEY: ${{ secrets.HF_API_KEY }}
+      HF_API_KEY_2: ${{ secrets.HF_API_KEY_2 }}
+      HF_API_KEY_3: ${{ secrets.HF_API_KEY_3 }}
+      HF_API_KEY_4: ${{ secrets.HF_API_KEY_4 }}
+      HF_API_KEY_5: ${{ secrets.HF_API_KEY_5 }}
+
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+
+      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+      SAMBANOVA_API_KEY_2: ${{ secrets.SAMBANOVA_API_KEY_2 }}
+      SAMBANOVA_API_KEY_3: ${{ secrets.SAMBANOVA_API_KEY_3 }}
+      SAMBANOVA_API_KEY_4: ${{ secrets.SAMBANOVA_API_KEY_4 }}
+      SAMBANOVA_API_KEY_5: ${{ secrets.SAMBANOVA_API_KEY_5 }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
