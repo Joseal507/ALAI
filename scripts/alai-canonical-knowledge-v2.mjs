@@ -12,9 +12,7 @@ function safe(s = '') {
 }
 
 function cleanText(s = '') {
-  return String(s || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(s || '').replace(/\s+/g, ' ').trim();
 }
 
 function extractCanonical(raw = '') {
@@ -40,12 +38,12 @@ function extractField(raw = '', names = []) {
   for (const name of names) {
     const re = new RegExp(`${name}:\\s*([^:;]+?)(?=\\s+(?:concept|concepto|nombre|description|descripcion|relation|relacion):|;|$)`, 'i');
     const m = s.match(re);
-    if (m?.[1]) return cleanText(m[1]).slice(0, 500);
+    if (m?.[1]) return cleanText(m[1]).slice(0, 900);
   }
   return '';
 }
 
-function isBadPacked(raw = '') {
+function isPacked(raw = '') {
   const t = String(raw || '').toLowerCase();
   return (
     t.includes('concept:') ||
@@ -71,8 +69,8 @@ CREATE TABLE IF NOT EXISTS canonical_knowledge_v2_log (
 );
 `);
 
-const units = db.prepare(`
-SELECT id, title, confidence
+const packedUnits = db.prepare(`
+SELECT id, title, summary, explanation, examples, common_mistakes, related_concepts, sources, confidence
 FROM knowledge_units
 WHERE title LIKE '%concept:%'
    OR title LIKE '%concepto:%'
@@ -83,13 +81,15 @@ WHERE title LIKE '%concept:%'
    OR title LIKE '%relacion:%'
 `).all();
 
-let scanned = units.length;
+let scanned = packedUnits.length;
 let renamed = 0;
 let merged = 0;
 let claimsCreated = 0;
 let relationshipsCreated = 0;
+let semanticUpdated = 0;
+let relsUpdated = 0;
 
-for (const u of units) {
+for (const u of packedUnits) {
   const before = u.title;
   const canonical = extractCanonical(before);
   const description = extractField(before, ['description', 'descripcion']);
@@ -105,13 +105,35 @@ for (const u of units) {
     LIMIT 1
   `).get(canonical, u.id);
 
+  let targetId = u.id;
+  let targetTitle = canonical;
+
   if (existing) {
+    targetId = existing.id;
+    targetTitle = existing.title;
+
     db.prepare(`
       UPDATE knowledge_units
       SET confidence=MAX(confidence, ?),
+          summary=CASE WHEN length(summary) < length(?) THEN ? ELSE summary END,
+          explanation=CASE WHEN length(explanation) < length(?) THEN ? ELSE explanation END,
+          examples=CASE WHEN length(examples) < length(?) THEN ? ELSE examples END,
+          common_mistakes=CASE WHEN length(common_mistakes) < length(?) THEN ? ELSE common_mistakes END,
+          related_concepts=CASE WHEN length(related_concepts) < length(?) THEN ? ELSE related_concepts END,
+          sources=CASE WHEN length(sources) < length(?) THEN ? ELSE sources END,
           updated_at=?
       WHERE id=?
-    `).run(Number(u.confidence || 60), now, existing.id);
+    `).run(
+      Number(u.confidence || 60),
+      u.summary, u.summary,
+      u.explanation, u.explanation,
+      u.examples, u.examples,
+      u.common_mistakes, u.common_mistakes,
+      u.related_concepts, u.related_concepts,
+      u.sources, u.sources,
+      now,
+      existing.id
+    );
 
     db.prepare(`
       UPDATE knowledge_claims
@@ -120,13 +142,14 @@ for (const u of units) {
           subject=CASE WHEN lower(subject)=lower(?) THEN ? ELSE subject END,
           canonical_subject=?
       WHERE knowledge_id=?
-    `).run(existing.id, existing.title, before, existing.title, existing.title.toLowerCase(), u.id);
-
-    db.prepare(`
-      UPDATE knowledge_entities
-      SET knowledge_id=?
-      WHERE knowledge_id=?
-    `).run(existing.id, u.id);
+    `).run(
+      existing.id,
+      existing.title,
+      before,
+      existing.title.toLowerCase(),
+      existing.title.toLowerCase(),
+      u.id
+    );
 
     db.prepare(`
       UPDATE semantic_memory
@@ -135,10 +158,25 @@ for (const u of units) {
       WHERE knowledge_id=?
     `).run(existing.id, existing.title, u.id);
 
-    db.prepare(`
-      DELETE FROM knowledge_units
-      WHERE id=?
-    `).run(u.id);
+    const srcUpdate = db.prepare(`
+      UPDATE knowledge_relationships
+      SET source_id=?,
+          source_title=?,
+          updated_at=?
+      WHERE source_id=? OR lower(source_title)=lower(?)
+    `).run(existing.id, existing.title, now, u.id, before);
+
+    const tgtUpdate = db.prepare(`
+      UPDATE knowledge_relationships
+      SET target_id=?,
+          target_title=?,
+          updated_at=?
+      WHERE target_id=? OR lower(target_title)=lower(?)
+    `).run(existing.id, existing.title, now, u.id, before);
+
+    relsUpdated += Number(srcUpdate.changes || 0) + Number(tgtUpdate.changes || 0);
+
+    db.prepare(`DELETE FROM knowledge_units WHERE id=?`).run(u.id);
 
     db.prepare(`
       INSERT OR REPLACE INTO canonical_knowledge_v2_log
@@ -151,9 +189,17 @@ for (const u of units) {
     db.prepare(`
       UPDATE knowledge_units
       SET title=?,
+          summary=CASE WHEN summary='' AND ?!='' THEN ? ELSE summary END,
+          explanation=CASE WHEN explanation='' AND ?!='' THEN ? ELSE explanation END,
           updated_at=?
       WHERE id=?
-    `).run(canonical, now, u.id);
+    `).run(
+      canonical,
+      description, description,
+      description, description,
+      now,
+      u.id
+    );
 
     db.prepare(`
       UPDATE knowledge_claims
@@ -163,11 +209,28 @@ for (const u of units) {
       WHERE knowledge_id=?
     `).run(canonical, before, canonical.toLowerCase(), canonical.toLowerCase(), u.id);
 
-    db.prepare(`
+    const sm = db.prepare(`
       UPDATE semantic_memory
       SET title=?
       WHERE knowledge_id=?
     `).run(canonical, u.id);
+    semanticUpdated += Number(sm.changes || 0);
+
+    const srcUpdate = db.prepare(`
+      UPDATE knowledge_relationships
+      SET source_title=?,
+          updated_at=?
+      WHERE source_id=? OR lower(source_title)=lower(?)
+    `).run(canonical, now, u.id, before);
+
+    const tgtUpdate = db.prepare(`
+      UPDATE knowledge_relationships
+      SET target_title=?,
+          updated_at=?
+      WHERE target_id=? OR lower(target_title)=lower(?)
+    `).run(canonical, now, u.id, before);
+
+    relsUpdated += Number(srcUpdate.changes || 0) + Number(tgtUpdate.changes || 0);
 
     db.prepare(`
       INSERT OR REPLACE INTO canonical_knowledge_v2_log
@@ -178,8 +241,11 @@ for (const u of units) {
     renamed++;
   }
 
-  const targetId = existing?.id || u.id;
-  const targetTitle = existing?.title || canonical;
+  db.prepare(`
+    INSERT OR IGNORE INTO knowledge_entities
+    (id, name, canonical_name, entity_type, confidence, created_at, updated_at)
+    VALUES (?, ?, ?, 'concept', 0.85, ?, ?)
+  `).run(`ent_${safe(targetTitle)}`, targetTitle, targetTitle.toLowerCase(), now, now);
 
   if (description) {
     db.prepare(`
@@ -222,14 +288,15 @@ for (const u of units) {
 
     db.prepare(`
       INSERT OR IGNORE INTO knowledge_relationships
-      (id, source_title, target_title, relationship, confidence, reason, created_at, updated_at)
+      (id, source_id, source_title, target_id, target_title, relationship, reason, confidence, created_at, updated_at)
       VALUES
-      (?, ?, ?, 'related_to', ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, 'related_to', ?, 72, ?, ?)
     `).run(
       `rel_context_${safe(targetTitle)}`,
+      targetId,
       targetTitle,
+      'context',
       'Contexto relacionado',
-      0.72,
       relation,
       now,
       now
@@ -238,8 +305,7 @@ for (const u of units) {
   }
 }
 
-// Clean relationships whose titles are still packed.
-const rels = db.prepare(`
+const packedRels = db.prepare(`
 SELECT id, source_title, target_title
 FROM knowledge_relationships
 WHERE source_title LIKE '%concept:%'
@@ -260,9 +326,9 @@ WHERE source_title LIKE '%concept:%'
 
 let relCleaned = 0;
 
-for (const r of rels) {
-  const source = isBadPacked(r.source_title) ? extractCanonical(r.source_title) : r.source_title;
-  const target = isBadPacked(r.target_title) ? extractCanonical(r.target_title) : r.target_title;
+for (const r of packedRels) {
+  const source = isPacked(r.source_title) ? extractCanonical(r.source_title) : r.source_title;
+  const target = isPacked(r.target_title) ? extractCanonical(r.target_title) : r.target_title;
 
   db.prepare(`
     UPDATE knowledge_relationships
@@ -281,7 +347,9 @@ console.log(JSON.stringify({
   merged,
   description_relation_claims_created_attempted: claimsCreated,
   relationships_created_attempted: relationshipsCreated,
-  relationships_cleaned: relCleaned,
+  semantic_memory_updated: semanticUpdated,
+  relationship_rows_updated: relsUpdated,
+  packed_relationships_cleaned: relCleaned,
   remaining_packed_units: db.prepare(`
     SELECT COUNT(*) total
     FROM knowledge_units
