@@ -67,7 +67,9 @@ const steps = [
   ['relationships_clean', 'scripts/alai-relationship-normalizer.mjs'],
   ['semantic_infer', 'scripts/alai-semantic-inference-rebuild.mjs'],
   ['hypotheses', 'scripts/alai-hypothesis-generator.mjs'],
+  ['hypothesis_validator', 'scripts/alai-hypothesis-validator.mjs'],
   ['reasoning_feedback', 'scripts/alai-reasoning-feedback-engine.mjs'],
+  ['conflict_engine', 'scripts/alai-conflict-engine.mjs'],
   ['mastery_sync', 'scripts/alai-mastery-sync.mjs'],
   ['learning_gain', 'scripts/alai-learning-gain-engine.mjs']
 ];
