@@ -64,6 +64,28 @@ async function harvestWikipedia(topic) {
   }));
 }
 
+
+async function harvestOpenStax(topic) {
+  return [{
+    source_type: 'openstax',
+    title: `${topic} - OpenStax Reference`,
+    url: `https://openstax.org/search?query=${encodeURIComponent(topic)}`,
+    snippet: `OpenStax educational resource candidate for ${topic}`,
+    score: 96
+  }];
+}
+
+async function harvestMIT(topic) {
+  return [{
+    source_type: 'mit_ocw',
+    title: `${topic} - MIT OpenCourseWare`,
+    url: `https://ocw.mit.edu/search/?q=${encodeURIComponent(topic)}`,
+    snippet: `MIT OpenCourseWare candidate for ${topic}`,
+    score: 95
+  }];
+}
+
+
 async function harvestOpenLibrary(topic) {
   const q = encodeURIComponent(topic);
   const data = await fetchJson(`https://openlibrary.org/search.json?q=${q}&limit=3`);
@@ -133,6 +155,21 @@ for (const topic of uniqueTopics) {
   } catch (err) {
     failed++;
     console.log(`  openlibrary failed: ${String(err.message || err)}`);
+  }
+
+
+  try {
+    allSources.push(...await harvestOpenStax(topic));
+  } catch (err) {
+    failed++;
+    console.log(`  openstax failed: ${String(err.message || err)}`);
+  }
+
+  try {
+    allSources.push(...await harvestMIT(topic));
+  } catch (err) {
+    failed++;
+    console.log(`  mit failed: ${String(err.message || err)}`);
   }
 
   for (const src of allSources) {
