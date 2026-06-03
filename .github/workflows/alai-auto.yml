@@ -59,15 +59,18 @@ jobs:
       - name: Start ALAI server
         run: |
           echo "===== START SERVER ====="
-          nohup npm run dev -- -p 6969 > logs/next-server.log 2>&1 &
+          nohup npm run dev -- -H 127.0.0.1 -p 6969 > logs/next-server.log 2>&1 &
           echo $! > logs/next-server.pid
-          disown || true
+          sleep 5
 
           for i in {1..45}; do
             echo "Waiting for ALAI server... $i"
-            if curl -fsS http://127.0.0.1:6969/api/health > /dev/null 2>&1; then
+
+            echo "----- next log tail -----"
+            tail -30 logs/next-server.log || true
+
+            if curl --max-time 2 -fsS http://127.0.0.1:6969/api/health > /dev/null 2>&1; then
               echo "ALAI server is ready."
-              tail -80 logs/next-server.log || true
               exit 0
             fi
 
