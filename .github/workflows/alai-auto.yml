@@ -59,15 +59,24 @@ jobs:
       - name: Start ALAI server
         run: |
           echo "===== START SERVER ====="
-          npm run dev -- -p 6969 > logs/next-server.log 2>&1 &
+          nohup npm run dev -- -p 6969 > logs/next-server.log 2>&1 &
           echo $! > logs/next-server.pid
+          disown || true
 
-          for i in {1..30}; do
-            if curl -fsS http://localhost:6969/api/health > /dev/null 2>&1; then
+          for i in {1..45}; do
+            echo "Waiting for ALAI server... $i"
+            if curl -fsS http://127.0.0.1:6969/api/health > /dev/null 2>&1; then
               echo "ALAI server is ready."
+              tail -80 logs/next-server.log || true
               exit 0
             fi
-            echo "Waiting for ALAI server... $i"
+
+            if ! kill -0 $(cat logs/next-server.pid) 2>/dev/null; then
+              echo "ALAI server process died."
+              cat logs/next-server.log || true
+              exit 1
+            fi
+
             sleep 2
           done
 
