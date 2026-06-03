@@ -28,6 +28,21 @@ function slug(s) {
     .slice(0, 100);
 }
 
+
+function isHarvestableTopic(topic) {
+  const t = String(topic || '').toLowerCase();
+  if (!t || t.length < 2) return false;
+  if (t.includes('alai_')) return false;
+  if (t.includes('stage=')) return false;
+  if (t.includes('path=')) return false;
+  if (t.includes('task=')) return false;
+  if (t.includes('target=')) return false;
+  if (t.includes('facultad completa')) return false;
+  if (t.includes('carrera completa')) return false;
+  if (t.includes('programa completo')) return false;
+  return true;
+}
+
 function cleanTopic(raw) {
   let s = String(raw || '').trim();
   const target = s.match(/target=([^|]+)/i)?.[1];
@@ -126,7 +141,7 @@ const topics = [...jobs, ...qualityWeak]
   .map(r => cleanTopic(r.topic))
   .filter(Boolean);
 
-const uniqueTopics = [...new Set(topics)].slice(0, 20);
+const uniqueTopics = [...new Set(topics)].filter(isHarvestableTopic).slice(0, 20);
 
 const insert = db.prepare(`
 INSERT OR IGNORE INTO knowledge_sources
