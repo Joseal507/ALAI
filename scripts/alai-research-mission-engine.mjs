@@ -3,6 +3,29 @@ import Database from 'better-sqlite3';
 const db = new Database('data/alai.db');
 const now = Date.now();
 
+
+function isStructureTopic(topic = '') {
+  const t = String(topic || '').toLowerCase();
+  return (
+    t.includes('facultad completa') ||
+    t.includes('carrera completa') ||
+    t.includes('programa completo') ||
+    t.startsWith('facultad ') ||
+    t.startsWith('carrera ')
+  );
+}
+
+function isInternalTopic(topic = '') {
+  const t = String(topic || '');
+  return (
+    t.includes('ALAI_') ||
+    t.includes('stage=') ||
+    t.includes('path=') ||
+    t.includes('task=') ||
+    t.includes('mastery_required=')
+  );
+}
+
 function safe(s) {
   return String(s || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -35,6 +58,10 @@ ORDER BY confidence ASC
 `).all(activeStage);
 
 for (const w of weakRequired) {
+  if (isStructureTopic(w.topic) || isInternalTopic(w.topic)) {
+    continue;
+  }
+
   insertMission.run({
     id: `mission_gap_${safe(w.path)}`,
     topic: w.topic,
@@ -103,6 +130,7 @@ LIMIT 80
 
 for (const e of weakEvidence) {
   if (String(e.title).startsWith('ALAI_')) continue;
+  if (isStructureTopic(e.title) || isInternalTopic(e.title)) continue;
 
   insertMission.run({
     id: `mission_evidence_${safe(e.title)}`,
