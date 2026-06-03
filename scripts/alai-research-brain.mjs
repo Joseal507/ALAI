@@ -64,6 +64,7 @@ const steps = [
   ['claims_normalize', 'scripts/alai-claim-normalizer.mjs'],
   ['structured_claims', 'scripts/alai-structured-claim-extractor.mjs'],
   ['claim_verify', 'scripts/alai-claim-verification-v2.mjs'],
+  ['consolidation_brain', 'scripts/alai-consolidation-brain.mjs'],
   ['relationships_clean', 'scripts/alai-relationship-normalizer.mjs'],
   ['semantic_infer', 'scripts/alai-semantic-inference-rebuild.mjs'],
   ['hypotheses', 'scripts/alai-hypothesis-generator.mjs'],
